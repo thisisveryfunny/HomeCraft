@@ -62,7 +62,7 @@ The Minecraft server files are expected at `/minecraft`. You can change this by 
 
 ### Server Memory
 
-Default memory allocation is `-Xmx1024M -Xms512M`. Modify in `src/lib/server/minecraft.ts`.
+Default memory allocation is `-Xmx8G -Xms8G`. Modify in `src/lib/server/minecraft.ts`.
 
 ## 📦 Production Deployment
 
@@ -84,26 +84,8 @@ npm run build
 PORT=3000 node build
 ```
 
-## 🎨 Theme
-
-HomeCraft uses a dark gray and green color scheme:
-- Background: Gray 900/800
-- Accent: Green 500/600
-- Perfect for late-night server management!
-
 ## 📸 Screenshots
 
-| Dashboard | File Manager |
-|-----------|--------------|
-| Server status, online players, quick stats | Browse, edit, upload files |
-
-| Console | Player Management |
-|---------|-------------------|
-| Real-time logs, send commands | Whitelist, operators, bans |
-
-| Settings | MOTD Editor |
-|----------|-------------|
-| Easy property toggles | Color codes, live preview |
 
 ## 🔒 Security Note
 
@@ -118,5 +100,3 @@ MIT License - feel free to use, modify, and distribute.
 Contributions welcome! Please open an issue or PR.
 
 ---
-
-Made with ❤️ for Minecraft server admins
