@@ -10,11 +10,29 @@ class MinecraftServer extends EventEmitter {
 	private maxLogs = 500;
 	private onlinePlayers: Set<string> = new Set();
 	private startTime: number | null = null;
+	private playerListInterval: ReturnType<typeof setInterval> | null = null;
 
 	constructor() {
 		super();
 		// Prevent unhandled error events from crashing the process
 		this.on('error', () => {});
+	}
+
+	private startPlayerListPolling() {
+		this.stopPlayerListPolling();
+		// Poll player list every 10 seconds to keep it in sync
+		this.playerListInterval = setInterval(() => {
+			if (this.isRunning && this.process?.stdin) {
+				this.process.stdin.write('list\n');
+			}
+		}, 10000);
+	}
+
+	private stopPlayerListPolling() {
+		if (this.playerListInterval) {
+			clearInterval(this.playerListInterval);
+			this.playerListInterval = null;
+		}
 	}
 
 	get isRunning(): boolean {
@@ -29,32 +47,51 @@ class MinecraftServer extends EventEmitter {
 		return [...this.onlinePlayers];
 	}
 
+	private stripAnsiCodes(str: string): string {
+		// Remove ANSI escape codes (color codes like \x1b[93m)
+		return str.replace(/\x1b\[[0-9;]*m/g, '');
+	}
+
 	private parsePlayerEvents(line: string) {
-		// Match patterns like "[Server thread/INFO]: PlayerName joined the game"
-		const joinMatch = line.match(/\[Server thread\/INFO\]:\s*(\w+)\s+joined the game/);
+		// Strip ANSI color codes for reliable parsing
+		const cleanLine = this.stripAnsiCodes(line);
+
+		// Match patterns like "PlayerName joined the game"
+		const joinMatch = cleanLine.match(/(\S+)\s+joined the game/);
 		if (joinMatch) {
 			this.onlinePlayers.add(joinMatch[1]);
 			return;
 		}
 
-		// Match patterns like "[Server thread/INFO]: PlayerName left the game"
-		const leaveMatch = line.match(/\[Server thread\/INFO\]:\s*(\w+)\s+left the game/);
+		// Match patterns like "PlayerName left the game"
+		const leaveMatch = cleanLine.match(/(\S+)\s+left the game/);
 		if (leaveMatch) {
 			this.onlinePlayers.delete(leaveMatch[1]);
 			return;
 		}
 
-		// Parse "list" command output: "There are X of a max of Y players online: player1, player2"
-		const listMatch = line.match(/There are (\d+) of a max of \d+ players online:(.*)/);
-		if (listMatch) {
+		// Parse vanilla "list" command output: "There are X of a max of Y players online: player1, player2"
+		const vanillaListMatch = cleanLine.match(/There are (\d+) of a max of \d+ players online:(.*)/);
+		if (vanillaListMatch) {
 			this.onlinePlayers.clear();
-			const playerList = listMatch[2].trim();
+			const playerList = vanillaListMatch[2].trim();
 			if (playerList) {
 				playerList.split(',').forEach(p => {
 					const name = p.trim();
 					if (name) this.onlinePlayers.add(name);
 				});
 			}
+			return;
+		}
+
+		// Parse Essentials "list" command output: "There are X out of maximum Y players online."
+		const essentialsListMatch = cleanLine.match(/There are (\d+) out of maximum \d+ players online/);
+		if (essentialsListMatch) {
+			const count = parseInt(essentialsListMatch[1], 10);
+			if (count === 0) {
+				this.onlinePlayers.clear();
+			}
+			// If count > 0, players are listed on following lines, parsed by join events
 		}
 	}
 
@@ -96,6 +133,7 @@ class MinecraftServer extends EventEmitter {
 			});
 
 			this.process.on('close', (code) => {
+				this.stopPlayerListPolling();
 				this.logs.push(`[SYSTEM] Server stopped with code ${code}`);
 				this.process = null;
 				this.onlinePlayers.clear();
@@ -104,12 +142,16 @@ class MinecraftServer extends EventEmitter {
 			});
 
 			this.process.on('error', (err) => {
+				this.stopPlayerListPolling();
 				this.logs.push(`[SYSTEM] Error: ${err.message}`);
 				this.process = null;
 				this.onlinePlayers.clear();
 				this.startTime = null;
 				// Don't re-emit, just log it - prevents crash
 			});
+
+			// Start polling player list after server starts
+			this.startPlayerListPolling();
 
 			return { success: true, message: 'Server starting...' };
 		} catch (error) {
