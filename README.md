@@ -21,7 +21,7 @@ A modern, self-hosted Minecraft server admin panel built with SvelteKit. Manage 
 ### Automatic Setup
 
 ```bash
-git clone https://github.com/yourusername/HomeCraft.git
+git clone https://github.com/thisisveryfunny/HomeCraft.git
 cd HomeCraft
 chmod +x setup.sh
 ./setup.sh
