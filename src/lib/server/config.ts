@@ -10,7 +10,7 @@ const CONFIG_DIR = path.join(process.cwd(), '.homecraft');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 export function getDefaultMinecraftDir(): string {
-	return process.platform === 'win32' ? 'C:\\minecraft' : '/minecraft';
+	return process.platform === 'win32' ? 'C:\\Users\\meterpeter\\Downloads\\mc-mods-server' : '/minecraft';
 }
 
 function normalizeConfig(config: Partial<HomeCraftConfig>): HomeCraftConfig {

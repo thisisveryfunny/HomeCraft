@@ -239,9 +239,12 @@
 					{#each whitelist as player}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<div class="w-8 h-8 bg-gray-600 rounded flex items-center justify-center">
-									👤
-								</div>
+								<img 
+									src="https://mc-heads.net/avatar/{player.name}/32" 
+									alt={player.name}
+									class="w-full h-full"
+									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+								/>
 								<div>
 									<div class="font-medium">{player.name}</div>
 									{#if player.uuid}
@@ -298,9 +301,12 @@
 					{#each ops as op}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<div class="w-8 h-8 bg-yellow-600 rounded flex items-center justify-center">
-									👑
-								</div>
+								<img 
+									src="https://mc-heads.net/avatar/{op.name}/32" 
+									alt={op.name}
+									class="w-full h-full"
+									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+								/>
 								<div>
 									<div class="font-medium">{op.name}</div>
 									<div class="text-xs text-gray-500">Level {op.level || 4}</div>
@@ -354,9 +360,12 @@
 					{#each banned as player}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<div class="w-8 h-8 bg-red-600 rounded flex items-center justify-center">
-									🚫
-								</div>
+								<img 
+									src="https://mc-heads.net/avatar/{player.name}/32" 
+									alt={player.name}
+									class="w-full h-full"
+									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+								/>
 								<div>
 									<div class="font-medium">{player.name}</div>
 									<div class="text-xs text-gray-500">{player.reason || 'No reason'}</div>
