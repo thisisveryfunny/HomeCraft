@@ -14,6 +14,7 @@
 	let minecraftDir = $state('');
 	let defaultMinecraftDir = $state('');
 	let message = $state('');
+	let savingMinecraftDir = $state(false);
 
 	function formatUptime(seconds: number | null): string {
 		if (seconds === null) return '--';
@@ -66,10 +67,29 @@
 			message = `Error: ${e}`;
 		}
 	}
-
-	async function goToSettings() {
-		window.location.href = '/settings';
+	async function saveMinecraftDir() {
+		if (!minecraftDir.trim()) return;
+		savingMinecraftDir = true;
+		try {
+			const res = await fetch('/api/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ minecraftDir: minecraftDir.trim() })
+			});
+			const data = await res.json();
+			if (data.success) {
+				minecraftDir = data.config.minecraftDir;
+				message = data.message;
+			} else {
+				message = data.error;
+			}
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			savingMinecraftDir = false;
+		}
 	}
+
 
 	onMount(() => {
 		fetchStatus();
@@ -109,10 +129,11 @@
 					class="input flex-1 font-mono text-sm"
 				/>
 				<button
-					onclick={goToSettings}
+					onclick={saveMinecraftDir}
+					disabled={savingMinecraftDir || !minecraftDir.trim()}
 					class="btn-primary"
 				>
-					Go to Settings
+					{savingMinecraftDir ? '⏳ Saving...' : 'Save Folder'}
 				</button>
 			</div>
 			<p class="text-sm text-gray-400">
