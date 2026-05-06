@@ -27,6 +27,10 @@
 	let message = $state('');
 	let activeTab = $state<'player-list' | 'whitelist' | 'ops' | 'banned'>('player-list');
 
+	function hasPlayer(list: Player[], name: string): boolean {
+		return list.some((player) => player.name.toLowerCase() === name.toLowerCase());
+	}
+
 	async function fetchAll() {
 		try {
 			const [playersRes, whitelistRes, serverRes] = await Promise.all([
@@ -102,6 +106,24 @@
 		}
 	}
 
+	async function removeActiveFromWhitelist(name: string) {
+		loading = true;
+		try {
+			const res = await fetch('/api/whitelist', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'remove', name })
+			});
+			const data = await res.json();
+			message = data.message || data.error;
+			if (data.success) await fetchAll();
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			loading = false;
+		}
+	}
+
 	// Ops functions
 	async function addOp() {
 		if (!newOp.trim()) return;
@@ -136,6 +158,24 @@
 			});
 			const data = await res.json();
 			message = data.message;
+			if (data.success) await fetchAll();
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function promoteActivePlayer(name: string) {
+		loading = true;
+		try {
+			const res = await fetch('/api/players', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'add', type: 'ops', name })
+			});
+			const data = await res.json();
+			message = data.message || data.error;
 			if (data.success) await fetchAll();
 		} catch (e) {
 			message = `Error: ${e}`;
@@ -192,8 +232,32 @@
 		}
 	}
 
+	async function banActivePlayer(name: string) {
+		if (!confirm(`Ban ${name}?`)) return;
+		loading = true;
+		try {
+			const res = await fetch('/api/players', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'add',
+					type: 'banned',
+					name,
+					reason: 'Banned by admin'
+				})
+			});
+			const data = await res.json();
+			message = data.message || data.error;
+			if (data.success) await fetchAll();
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			loading = false;
+		}
+	}
+
 	onMount(() => {
-		fetchAll()
+		fetchAll();
 		const interval = setInterval(fetchStatus, 3000);
 		return () => clearInterval(interval);
 	});
@@ -217,10 +281,7 @@
 				? 'text-green-500 border-b-2 border-green-500'
 				: 'text-gray-400 hover:text-white'}"
 		>
-			👥 Player List (serverStatus.playerCount)
-			{#if serverStatus.running}
-				<span class="ml-1 text-xs text-gray-500">({serverStatus.players.join(', ')})</span>
-			{/if}
+			👥 Active Players ({serverStatus.playerCount})
 		</button>
 		<button
 			onclick={() => (activeTab = 'whitelist')}
@@ -248,7 +309,81 @@
 		</button>
 	</div>
 
-	{#if activeTab === 'whitelist'}
+	{#if activeTab === 'player-list'}
+		<!-- Active Players Tab -->
+		<div class="card">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="font-semibold text-gray-300">Active Players</h3>
+				<div class="flex items-center gap-2">
+					<div class="w-2.5 h-2.5 rounded-full {serverStatus.running ? 'bg-green-500' : 'bg-red-500'}"></div>
+					<span class="text-sm text-gray-400">{serverStatus.running ? 'Server online' : 'Server offline'}</span>
+				</div>
+			</div>
+
+			{#if loading}
+				<div class="text-center py-8 text-gray-400">Loading...</div>
+			{:else if !serverStatus.running}
+				<p class="text-gray-500 text-center py-8">Server is offline.</p>
+			{:else if serverStatus.players.length === 0}
+				<p class="text-gray-500 text-center py-8">No players online.</p>
+			{:else}
+				<div class="space-y-2">
+					{#each serverStatus.players as player}
+						<div class="flex flex-col gap-3 p-3 bg-gray-700 rounded hover:bg-gray-600 sm:flex-row sm:items-center sm:justify-between">
+							<div class="flex items-center gap-3 min-w-0">
+								<div class="w-10 h-10 bg-gray-600 rounded overflow-hidden flex items-center justify-center flex-shrink-0">
+									<img
+										src="https://mc-heads.net/avatar/{player}/40"
+										alt={player}
+										class="w-full h-full"
+										onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+									/>
+								</div>
+								<div class="min-w-0">
+									<div class="font-medium truncate">{player}</div>
+									<div class="flex flex-wrap gap-1 mt-1 text-xs">
+										{#if hasPlayer(whitelist, player)}
+											<span class="px-2 py-0.5 rounded bg-green-600/30 text-green-300">Whitelisted</span>
+										{/if}
+										{#if hasPlayer(ops, player)}
+											<span class="px-2 py-0.5 rounded bg-yellow-600/30 text-yellow-300">Operator</span>
+										{/if}
+										{#if hasPlayer(banned, player)}
+											<span class="px-2 py-0.5 rounded bg-red-600/30 text-red-300">Banned</span>
+										{/if}
+									</div>
+								</div>
+							</div>
+
+							<div class="flex flex-wrap gap-2 sm:justify-end">
+								<button
+									onclick={() => removeActiveFromWhitelist(player)}
+									disabled={loading || !hasPlayer(whitelist, player)}
+									class="btn-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+								>
+									Unwhitelist
+								</button>
+								<button
+									onclick={() => promoteActivePlayer(player)}
+									disabled={loading || hasPlayer(ops, player)}
+									class="btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+								>
+									Make Op
+								</button>
+								<button
+									onclick={() => banActivePlayer(player)}
+									disabled={loading || hasPlayer(banned, player)}
+									class="btn-danger text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+								>
+									Ban
+								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{:else if activeTab === 'whitelist'}
 		<!-- Whitelist Tab -->
 		<div class="card">
 			<h3 class="font-semibold mb-3 text-gray-300">Add to Whitelist</h3>
