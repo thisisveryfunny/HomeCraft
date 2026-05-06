@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { confirmPopup } from '$lib/popup';
 
 	interface Properties {
 		[key: string]: string;
@@ -241,7 +242,14 @@
 	}
 
 	async function removeIcon() {
-		if (!confirm('Remove server icon?')) return;
+		if (
+			!(await confirmPopup({
+				title: 'Remove server icon',
+				message: 'Remove the current server icon?',
+				confirmText: 'Remove',
+				tone: 'danger'
+			}))
+		) return;
 		iconLoading = true;
 		try {
 			const res = await fetch('/api/icon', { method: 'DELETE' });

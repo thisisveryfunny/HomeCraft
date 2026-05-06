@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
+	import PopupDialog from '$lib/PopupDialog.svelte';
 
 	let { children } = $props();
 
@@ -50,3 +51,5 @@
 		{@render children()}
 	</main>
 </div>
+
+<PopupDialog />

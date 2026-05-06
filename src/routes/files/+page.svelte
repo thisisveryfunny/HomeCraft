@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { confirmPopup, promptPopup } from '$lib/popup';
 
 	interface FileItem {
 		name: string;
@@ -60,7 +61,12 @@
 	}
 
 	async function editFileName(path: string) {
-		const newName = prompt('Enter new name', path.split('/').pop() || '');
+		const newName = await promptPopup({
+			title: 'Rename item',
+			message: 'Enter the new name for this item.',
+			defaultValue: path.split('/').pop() || '',
+			confirmText: 'Rename'
+		});
 		if (!newName) return;
 		try {
 			const res = await fetch('/api/files', {
@@ -77,7 +83,14 @@
 	}
 
 	async function deleteItem(item: FileItem) {
-		if (!confirm(`Delete ${item.name}?`)) return;
+		if (
+			!(await confirmPopup({
+				title: 'Delete file',
+				message: `Delete ${item.name}? This action cannot be undone.`,
+				confirmText: 'Delete',
+				tone: 'danger'
+			}))
+		) return;
 		try {
 			const res = await fetch('/api/files', {
 				method: 'POST',

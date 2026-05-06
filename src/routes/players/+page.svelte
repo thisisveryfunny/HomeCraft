@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { confirmPopup } from '$lib/popup';
 
 	interface Player {
 		name: string;
@@ -88,7 +89,14 @@
 	}
 
 	async function removeFromWhitelist(name: string) {
-		if (!confirm(`Remove ${name} from whitelist?`)) return;
+		if (
+			!(await confirmPopup({
+				title: 'Remove from whitelist',
+				message: `Remove ${name} from the whitelist?`,
+				confirmText: 'Remove',
+				tone: 'danger'
+			}))
+		) return;
 		loading = true;
 		try {
 			const res = await fetch('/api/whitelist', {
@@ -166,7 +174,14 @@
 	}
 
 	async function removeOp(name: string) {
-		if (!confirm(`Remove ${name} from operators?`)) return;
+		if (
+			!(await confirmPopup({
+				title: 'Remove operator',
+				message: `Remove ${name} from operators?`,
+				confirmText: 'Remove',
+				tone: 'danger'
+			}))
+		) return;
 		loading = true;
 		try {
 			const res = await fetch('/api/players', {
@@ -250,7 +265,13 @@
 	}
 
 	async function unbanPlayer(name: string) {
-		if (!confirm(`Unban ${name}?`)) return;
+		if (
+			!(await confirmPopup({
+				title: 'Unban player',
+				message: `Unban ${name}?`,
+				confirmText: 'Unban'
+			}))
+		) return;
 		loading = true;
 		try {
 			const res = await fetch('/api/players', {
@@ -269,7 +290,14 @@
 	}
 
 	async function banActivePlayer(name: string) {
-		if (!confirm(`Ban ${name}?`)) return;
+		if (
+			!(await confirmPopup({
+				title: 'Ban player',
+				message: `Ban ${name}?`,
+				confirmText: 'Ban',
+				tone: 'danger'
+			}))
+		) return;
 		loading = true;
 		try {
 			const res = await fetch('/api/players', {
@@ -311,14 +339,16 @@
 
 	<!-- Tabs -->
 	<div class="flex gap-2 border-b border-gray-700">
-		<button
-			onclick={() => (activeTab = 'player-list')}
-			class="px-4 py-2 font-medium transition-colors {activeTab === 'player-list'
-				? 'text-green-500 border-b-2 border-green-500'
-				: 'text-gray-400 hover:text-white'}"
-		>
-			👥 Active Players ({serverStatus.playerCount})
-		</button>
+		{#if serverStatus.running}
+			<button
+				onclick={() => (activeTab = 'player-list')}
+				class="px-4 py-2 font-medium transition-colors {activeTab === 'player-list'
+					? 'text-green-500 border-b-2 border-green-500'
+					: 'text-gray-400 hover:text-white'}"
+			>
+				👥 Active Players ({serverStatus.playerCount})
+			</button>
+		{/if}
 		<button
 			onclick={() => (activeTab = 'whitelist')}
 			class="px-4 py-2 font-medium transition-colors {activeTab === 'whitelist'
