@@ -109,8 +109,11 @@ Windows:
 ```powershell
 .\setup.ps1 -Production
 .\setup.ps1 -SkipMinecraft
+.\setup.ps1 -SkipRequirementInstall
 .\setup.ps1 -MinecraftDir "D:\Servers\Minecraft"
 ```
+
+`setup.ps1` uses `winget` to install or upgrade Node.js LTS and Temurin Java when available. If `winget` is not installed, it downloads portable Node.js and Java into `.homecraft\tools` and uses them from the current PowerShell session. If a globally installed tool was just added and the script still cannot find it, restart PowerShell and rerun the script.
 
 Linux:
 

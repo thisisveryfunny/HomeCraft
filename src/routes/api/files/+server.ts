@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { readdir, readFile, writeFile, unlink, stat, mkdir } from 'fs/promises';
+import { readdir, readFile, writeFile, unlink, stat, mkdir, rename } from 'fs/promises';
 import { dirname, posix } from 'path';
 import { getMinecraftDir, joinVirtualPath, resolveMinecraftPath } from '$lib/server/config';
 import type { RequestHandler } from './$types';
@@ -49,7 +49,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			case 'save':
 				await writeFile(fullPath, content, 'utf-8');
 				return json({ success: true, message: 'File saved' });
-
 			case 'delete':
 				await unlink(fullPath);
 				return json({ success: true, message: 'File deleted' });
@@ -71,7 +70,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				if (!newPath) {
 					return json({ error: 'Invalid new name' }, { status: 400 });
 				}
-				const { rename } = await import('fs/promises');
 				await rename(fullPath, newPath);
 				return json({ success: true, message: 'Renamed successfully' });
 

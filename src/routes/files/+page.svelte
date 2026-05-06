@@ -59,6 +59,23 @@
 		}
 	}
 
+	async function editFileName(path: string) {
+		const newName = prompt('Enter new name', path.split('/').pop() || '');
+		if (!newName) return;
+		try {
+			const res = await fetch('/api/files', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'rename', path, newName })
+			});
+			const data = await res.json();
+			message = data.message || data.error;
+			if (data.success) loadDirectory(currentPath);
+		} catch (e) {
+			message = `Error: ${e}`;
+		}
+	}
+
 	async function deleteItem(item: FileItem) {
 		if (!confirm(`Delete ${item.name}?`)) return;
 		try {
@@ -221,6 +238,12 @@
 								<span class="{item.isDirectory ? 'text-green-400' : 'text-gray-300'}">
 									{item.name}
 								</span>
+							</button>
+							<button
+								onclick={() => editFileName(item.path)}
+								class="opacity-0 group-hover:opacity-100 text-blue-400 hover:text-blue-300 p-1"
+							>
+								✏️
 							</button>
 							{#if !item.isDirectory}
 								<button

@@ -11,6 +11,9 @@
 	let serverStatus = $state<ServerStatus>({ running: false, uptime: null, playerCount: 0, players: [] });
 	let recentLogs = $state<string[]>([]);
 	let loading = $state(true);
+	let minecraftDir = $state('');
+	let defaultMinecraftDir = $state('');
+	let message = $state('');
 
 	function formatUptime(seconds: number | null): string {
 		if (seconds === null) return '--';
@@ -53,8 +56,24 @@
 		}
 	}
 
+	async function fetchConfig() {
+		try {
+			const res = await fetch('/api/config');
+			const data = await res.json();
+			minecraftDir = data.config.minecraftDir;
+			defaultMinecraftDir = data.defaults.minecraftDir;
+		} catch (e) {
+			message = `Error: ${e}`;
+		}
+	}
+
+	async function goToSettings() {
+		window.location.href = '/settings';
+	}
+
 	onMount(() => {
 		fetchStatus();
+		fetchConfig();
 		const interval = setInterval(fetchStatus, 3000);
 		return () => clearInterval(interval);
 	});
@@ -69,6 +88,37 @@
 		>
 			🔄 Refresh
 		</button>
+	</div>
+
+	{#if message}
+		<div class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-sm">
+			{message}
+			<button onclick={() => (message = '')} class="ml-2 text-gray-400 hover:text-white">✕</button>
+		</div>
+	{/if}
+
+	<!-- Minecraft Folder Section -->
+	<div class="card">
+		<h3 class="font-semibold mb-4 text-gray-300">📁 Minecraft Server Folder</h3>
+		<div class="space-y-3">
+			<div class="flex gap-2">
+				<input
+					type="text"
+					bind:value={minecraftDir}
+					placeholder={defaultMinecraftDir}
+					class="input flex-1 font-mono text-sm"
+				/>
+				<button
+					onclick={goToSettings}
+					class="btn-primary"
+				>
+					Go to Settings
+				</button>
+			</div>
+			<p class="text-sm text-gray-400">
+				Use the absolute folder containing server.jar, server.properties, whitelist.json, ops.json, and banned-players.json.
+			</p>
+		</div>
 	</div>
 
 	<!-- Server Status Card -->

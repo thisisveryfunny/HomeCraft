@@ -1,6 +1,7 @@
 param(
 	[switch]$Production,
 	[switch]$SkipMinecraft,
+	[switch]$SkipRequirementInstall,
 	[string]$MinecraftDir = "C:\minecraft"
 )
 
@@ -8,9 +9,76 @@ $ErrorActionPreference = "Stop"
 
 $MinecraftJarUrl = "https://piston-data.mojang.com/v1/objects/e6ec2f64e6080b9b5d9b471b291c33cc7f509733/server.jar"
 $PanelPort = 3000
+$ToolsDir = Join-Path $PSScriptRoot ".homecraft\tools"
+$NodeVersion = "22.12.0"
+$NodeZipUrl = "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip"
+$JavaZipUrl = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse"
 
 function Test-Command($Name) {
 	return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Add-PathIfExists($Path) {
+	if ((Test-Path $Path) -and ($env:Path -notlike "*$Path*")) {
+		$env:Path = "$Path;$env:Path"
+	}
+}
+
+function Add-KnownToolPaths {
+	if (Test-Path $ToolsDir) {
+		Get-ChildItem -Path $ToolsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+			Add-PathIfExists $_.FullName
+			Add-PathIfExists (Join-Path $_.FullName "bin")
+		}
+	}
+
+	Add-PathIfExists "$env:ProgramFiles\nodejs"
+	Add-PathIfExists "${env:ProgramFiles(x86)}\nodejs"
+
+	foreach ($pattern in @(
+		"$env:ProgramFiles\Eclipse Adoptium\*\bin",
+		"$env:ProgramFiles\Java\*\bin",
+		"${env:ProgramFiles(x86)}\Eclipse Adoptium\*\bin",
+		"${env:ProgramFiles(x86)}\Java\*\bin"
+	)) {
+		Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+			Add-PathIfExists $_.FullName
+		}
+	}
+}
+
+function Expand-ToolArchive($Url, $ArchiveName, $ToolName) {
+	New-Item -ItemType Directory -Force -Path $ToolsDir | Out-Null
+	$archivePath = Join-Path $ToolsDir $ArchiveName
+	Write-Host "  Downloading $ToolName..."
+	Invoke-WebRequest -Uri $Url -OutFile $archivePath
+	Write-Host "  Extracting $ToolName..."
+	Expand-Archive -Path $archivePath -DestinationPath $ToolsDir -Force
+	Remove-Item $archivePath -Force
+	Add-KnownToolPaths
+}
+
+function Invoke-RequirementInstall($PackageId, $Name, $PortableUrl, $PortableArchive) {
+	if ($SkipRequirementInstall) {
+		throw "$Name is required. Install it manually or rerun this script without -SkipRequirementInstall."
+	}
+
+	if (Test-Command "winget") {
+		Write-Host "  Installing/upgrading $Name with winget..."
+		winget upgrade --id $PackageId --exact --source winget --accept-package-agreements --accept-source-agreements
+		if ($LASTEXITCODE -ne 0) {
+			winget install --id $PackageId --exact --source winget --accept-package-agreements --accept-source-agreements
+		}
+		if ($LASTEXITCODE -eq 0) {
+			Add-KnownToolPaths
+			return
+		}
+
+		Write-Host "  winget could not install $Name; using portable fallback."
+	} else {
+		Write-Host "  winget is not available; using portable $Name."
+	}
+	Expand-ToolArchive $PortableUrl $PortableArchive $Name
 }
 
 function Test-NodeVersion {
@@ -20,8 +88,12 @@ function Test-NodeVersion {
 	return ($major -eq 20 -and $minor -ge 19) -or ($major -eq 22 -and $minor -ge 12) -or ($major -ge 24)
 }
 
+function Get-JavaVersionLine {
+	return (cmd /c "java -version 2>&1" | Select-Object -First 1)
+}
+
 function Get-JavaMajorVersion {
-	$line = (& java -version 2>&1 | Select-Object -First 1)
+	$line = Get-JavaVersionLine
 	if ($line -match '"([^"]+)"') {
 		$parts = $Matches[1].Split(".")
 		if ($parts[0] -eq "1") {
@@ -36,28 +108,41 @@ Write-Host "HomeCraft Windows Setup"
 Write-Host "======================="
 
 Write-Host "[1/6] Checking requirements..."
+Add-KnownToolPaths
+
 if (-not (Test-Command "node")) {
-	throw "Node.js 20.19+, 22.12+, or 24+ is required. Install it from https://nodejs.org/ and rerun this script."
+	Invoke-RequirementInstall "OpenJS.NodeJS.LTS" "Node.js LTS" $NodeZipUrl "node.zip"
 }
 
 if (-not (Test-NodeVersion)) {
-	throw "Node.js 20.19+, 22.12+, or 24+ is required. Found $(& node -v)."
+	Write-Host "  Node.js $(& node -v) is too old."
+	Invoke-RequirementInstall "OpenJS.NodeJS.LTS" "Node.js LTS" $NodeZipUrl "node.zip"
+	if (-not (Test-Command "node") -or -not (Test-NodeVersion)) {
+		throw "Node.js 20.19+, 22.12+, or 24+ is required. Restart PowerShell and rerun this script if Node was just installed, or rerun to use the portable fallback."
+	}
 }
 Write-Host "  Node.js $(& node -v)"
 
 if (-not (Test-Command "npm")) {
-	throw "npm is required."
+	Invoke-RequirementInstall "OpenJS.NodeJS.LTS" "npm" $NodeZipUrl "node.zip"
+	if (-not (Test-Command "npm")) {
+		throw "npm is required. Restart PowerShell and rerun this script if Node was just installed, or rerun to use the portable fallback."
+	}
 }
 Write-Host "  npm $(& npm -v)"
 
 if (-not (Test-Command "java")) {
-	throw "Java 17+ is required. Install Temurin/OpenJDK 17+ and make sure java is on PATH."
+	Invoke-RequirementInstall "EclipseAdoptium.Temurin.21.JRE" "Java 17+" $JavaZipUrl "java.zip"
 }
 
 if ((Get-JavaMajorVersion) -lt 17) {
-	throw "Java 17+ is required. Found $(& java -version 2>&1 | Select-Object -First 1)."
+	Write-Host "  Java version is too old: $(Get-JavaVersionLine)"
+	Invoke-RequirementInstall "EclipseAdoptium.Temurin.21.JRE" "Java 17+" $JavaZipUrl "java.zip"
+	if (-not (Test-Command "java") -or (Get-JavaMajorVersion) -lt 17) {
+		throw "Java 17+ is required. Restart PowerShell and rerun this script if Java was just installed, or rerun to use the portable fallback."
+	}
 }
-Write-Host "  Java $(& java -version 2>&1 | Select-Object -First 1)"
+Write-Host "  Java $(Get-JavaVersionLine)"
 
 Write-Host "[2/6] Installing dependencies..."
 npm install
@@ -179,3 +264,4 @@ if ($Production) {
 }
 Write-Host ""
 Write-Host "Minecraft server folder: $resolvedMinecraftDir"
+Write-Host "Portable tools folder: $ToolsDir"
