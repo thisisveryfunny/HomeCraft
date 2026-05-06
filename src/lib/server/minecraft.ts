@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import { getMinecraftDir } from './config';
 
-const MC_SERVER_DIR = '/minecraft';
 const MC_JAR = 'server.jar';
 
 class MinecraftServer extends EventEmitter {
@@ -104,8 +104,9 @@ class MinecraftServer extends EventEmitter {
 			this.logs = [];
 			this.onlinePlayers.clear();
 			this.startTime = Date.now();
+			const minecraftDir = getMinecraftDir();
 			this.process = spawn('java', ['-Xmx1024M', '-Xms512M', '-jar', MC_JAR, 'nogui'], {
-				cwd: MC_SERVER_DIR,
+				cwd: minecraftDir,
 				stdio: ['pipe', 'pipe', 'pipe']
 			});
 

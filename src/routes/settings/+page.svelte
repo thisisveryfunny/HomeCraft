@@ -9,6 +9,9 @@
 	let loading = $state(true);
 	let saving = $state(false);
 	let message = $state('');
+	let minecraftDir = $state('');
+	let defaultMinecraftDir = $state('');
+	let savingMinecraftDir = $state(false);
 
 	// MOTD Editor state
 	let motdLine1 = $state('');
@@ -155,12 +158,49 @@
 		}
 	}
 
+	async function fetchConfig() {
+		try {
+			const res = await fetch('/api/config');
+			const data = await res.json();
+			minecraftDir = data.config.minecraftDir;
+			defaultMinecraftDir = data.defaults.minecraftDir;
+		} catch (e) {
+			message = `Error: ${e}`;
+		}
+	}
+
+	async function saveMinecraftDir() {
+		if (!minecraftDir.trim()) return;
+		savingMinecraftDir = true;
+		try {
+			const res = await fetch('/api/config', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ minecraftDir: minecraftDir.trim() })
+			});
+			const data = await res.json();
+			if (data.success) {
+				minecraftDir = data.config.minecraftDir;
+				message = data.message;
+				await Promise.all([fetchProperties(), fetchIcon()]);
+			} else {
+				message = data.error;
+			}
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			savingMinecraftDir = false;
+		}
+	}
+
 	async function fetchIcon() {
 		try {
 			const res = await fetch('/api/icon');
 			const data = await res.json();
 			if (data.exists) {
 				serverIcon = data.icon;
+			} else {
+				serverIcon = null;
 			}
 		} catch (e) {
 			console.error('Failed to fetch icon:', e);
@@ -234,6 +274,7 @@
 	}
 
 	onMount(() => {
+		fetchConfig();
 		fetchProperties();
 		fetchIcon();
 	});
@@ -274,6 +315,31 @@
 	{#if loading}
 		<div class="card text-center py-12 text-gray-400">Loading settings...</div>
 	{:else}
+		<!-- Minecraft Folder Section -->
+		<div class="card">
+			<h3 class="font-semibold mb-4 text-gray-300">📁 Minecraft Server Folder</h3>
+			<div class="space-y-3">
+				<div class="flex gap-2">
+					<input
+						type="text"
+						bind:value={minecraftDir}
+						placeholder={defaultMinecraftDir}
+						class="input flex-1 font-mono text-sm"
+					/>
+					<button
+						onclick={saveMinecraftDir}
+						disabled={savingMinecraftDir || !minecraftDir.trim()}
+						class="btn-primary"
+					>
+						{savingMinecraftDir ? '⏳ Saving...' : 'Save Folder'}
+					</button>
+				</div>
+				<p class="text-sm text-gray-400">
+					Use the absolute folder containing server.jar, server.properties, whitelist.json, ops.json, and banned-players.json.
+				</p>
+			</div>
+		</div>
+
 		<!-- Server Icon Section -->
 		<div class="card">
 			<h3 class="font-semibold mb-4 text-gray-300">🖼️ Server Icon</h3>

@@ -1,11 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { resolveMinecraftPath } from '$lib/server/config';
 import type { RequestHandler } from './$types';
-
-const MC_SERVER_DIR = '/minecraft';
-const OPS_FILE = join(MC_SERVER_DIR, 'ops.json');
-const BANNED_FILE = join(MC_SERVER_DIR, 'banned-players.json');
 
 interface OpsEntry {
 	uuid?: string;
@@ -37,9 +33,15 @@ async function saveJsonFile<T>(file: string, data: T[]): Promise<void> {
 }
 
 export const GET: RequestHandler = async () => {
+	const opsFile = resolveMinecraftPath('ops.json');
+	const bannedFile = resolveMinecraftPath('banned-players.json');
+	if (!opsFile || !bannedFile) {
+		return json({ ops: [], banned: [] });
+	}
+
 	const [ops, banned] = await Promise.all([
-		readJsonFile<OpsEntry>(OPS_FILE),
-		readJsonFile<BannedEntry>(BANNED_FILE)
+		readJsonFile<OpsEntry>(opsFile),
+		readJsonFile<BannedEntry>(bannedFile)
 	]);
 	return json({ ops, banned });
 };
@@ -52,14 +54,18 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	if (type === 'ops') {
-		const ops = await readJsonFile<OpsEntry>(OPS_FILE);
+		const opsFile = resolveMinecraftPath('ops.json');
+		if (!opsFile) {
+			return json({ error: 'Invalid Minecraft server path' }, { status: 400 });
+		}
+		const ops = await readJsonFile<OpsEntry>(opsFile);
 
 		if (action === 'add') {
 			if (ops.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
 				return json({ success: false, message: 'Player is already an operator' });
 			}
 			ops.push({ name, level: 4, bypassesPlayerLimit: false });
-			await saveJsonFile(OPS_FILE, ops);
+			await saveJsonFile(opsFile, ops);
 			return json({ success: true, message: `Made ${name} an operator` });
 		} else if (action === 'remove') {
 			const index = ops.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
@@ -67,11 +73,15 @@ export const POST: RequestHandler = async ({ request }) => {
 				return json({ success: false, message: 'Player is not an operator' });
 			}
 			ops.splice(index, 1);
-			await saveJsonFile(OPS_FILE, ops);
+			await saveJsonFile(opsFile, ops);
 			return json({ success: true, message: `Removed ${name} from operators` });
 		}
 	} else if (type === 'banned') {
-		const banned = await readJsonFile<BannedEntry>(BANNED_FILE);
+		const bannedFile = resolveMinecraftPath('banned-players.json');
+		if (!bannedFile) {
+			return json({ error: 'Invalid Minecraft server path' }, { status: 400 });
+		}
+		const banned = await readJsonFile<BannedEntry>(bannedFile);
 
 		if (action === 'add') {
 			if (banned.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
@@ -84,7 +94,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				source: 'HomeCraft Panel',
 				expires: 'forever'
 			});
-			await saveJsonFile(BANNED_FILE, banned);
+			await saveJsonFile(bannedFile, banned);
 			return json({ success: true, message: `Banned ${name}` });
 		} else if (action === 'remove') {
 			const index = banned.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
@@ -92,7 +102,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				return json({ success: false, message: 'Player is not banned' });
 			}
 			banned.splice(index, 1);
-			await saveJsonFile(BANNED_FILE, banned);
+			await saveJsonFile(bannedFile, banned);
 			return json({ success: true, message: `Unbanned ${name}` });
 		}
 	}

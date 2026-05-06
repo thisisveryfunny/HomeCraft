@@ -13,6 +13,7 @@
 	let editingFile = $state<string | null>(null);
 	let loading = $state(true);
 	let message = $state('');
+	let rootPath = $state('Minecraft server');
 	let showNewFileModal = $state(false);
 	let newFileName = $state('');
 	let newFileIsDir = $state(false);
@@ -22,6 +23,9 @@
 		try {
 			const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
 			const data = await res.json();
+			if (data.root) {
+				rootPath = data.root;
+			}
 			if (data.type === 'directory') {
 				currentPath = path;
 				items = data.items;
@@ -30,6 +34,8 @@
 			} else if (data.type === 'file') {
 				fileContent = data.content;
 				editingFile = path;
+			} else if (data.error) {
+				message = data.error;
 			}
 		} catch (e) {
 			message = `Error: ${e}`;
@@ -162,7 +168,7 @@
 
 	<!-- Breadcrumb -->
 	<div class="card flex items-center gap-2 text-sm">
-		<button onclick={() => loadDirectory('')} class="text-green-500 hover:underline">/minecraft</button>
+		<button onclick={() => loadDirectory('')} class="text-green-500 hover:underline truncate" title={rootPath}>{rootPath}</button>
 		{#each currentPath.split('/').filter(Boolean) as segment, i}
 			<span class="text-gray-500">/</span>
 			<button

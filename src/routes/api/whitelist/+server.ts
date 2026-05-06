@@ -1,31 +1,29 @@
 import { json } from '@sveltejs/kit';
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { resolveMinecraftPath } from '$lib/server/config';
 import type { RequestHandler } from './$types';
-
-const MC_SERVER_DIR = '/minecraft';
-const WHITELIST_FILE = join(MC_SERVER_DIR, 'whitelist.json');
 
 interface WhitelistEntry {
 	uuid?: string;
 	name: string;
 }
 
-async function readWhitelist(): Promise<WhitelistEntry[]> {
+async function readWhitelist(file: string): Promise<WhitelistEntry[]> {
 	try {
-		const content = await readFile(WHITELIST_FILE, 'utf-8');
+		const content = await readFile(file, 'utf-8');
 		return JSON.parse(content);
 	} catch {
 		return [];
 	}
 }
 
-async function saveWhitelist(whitelist: WhitelistEntry[]): Promise<void> {
-	await writeFile(WHITELIST_FILE, JSON.stringify(whitelist, null, 2), 'utf-8');
+async function saveWhitelist(file: string, whitelist: WhitelistEntry[]): Promise<void> {
+	await writeFile(file, JSON.stringify(whitelist, null, 2), 'utf-8');
 }
 
 export const GET: RequestHandler = async () => {
-	const whitelist = await readWhitelist();
+	const whitelistFile = resolveMinecraftPath('whitelist.json');
+	const whitelist = whitelistFile ? await readWhitelist(whitelistFile) : [];
 	return json({ whitelist });
 };
 
@@ -36,7 +34,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ error: 'Player name required' }, { status: 400 });
 	}
 
-	const whitelist = await readWhitelist();
+	const whitelistFile = resolveMinecraftPath('whitelist.json');
+	if (!whitelistFile) {
+		return json({ error: 'Invalid Minecraft server path' }, { status: 400 });
+	}
+	const whitelist = await readWhitelist(whitelistFile);
 
 	switch (action) {
 		case 'add': {
@@ -44,7 +46,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				return json({ success: false, message: 'Player already whitelisted' });
 			}
 			whitelist.push({ name });
-			await saveWhitelist(whitelist);
+			await saveWhitelist(whitelistFile, whitelist);
 			return json({ success: true, message: `Added ${name} to whitelist` });
 		}
 
@@ -54,7 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				return json({ success: false, message: 'Player not in whitelist' });
 			}
 			whitelist.splice(index, 1);
-			await saveWhitelist(whitelist);
+			await saveWhitelist(whitelistFile, whitelist);
 			return json({ success: true, message: `Removed ${name} from whitelist` });
 		}
 

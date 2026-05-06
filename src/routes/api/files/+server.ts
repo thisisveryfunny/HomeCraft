@@ -1,23 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { readdir, readFile, writeFile, unlink, stat, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { dirname, posix } from 'path';
+import { getMinecraftDir, joinVirtualPath, resolveMinecraftPath } from '$lib/server/config';
 import type { RequestHandler } from './$types';
-
-const MC_SERVER_DIR = '/minecraft';
-
-function isPathSafe(requestedPath: string): boolean {
-	const resolved = join(MC_SERVER_DIR, requestedPath);
-	return resolved.startsWith(MC_SERVER_DIR);
-}
 
 export const GET: RequestHandler = async ({ url }) => {
 	const path = url.searchParams.get('path') || '';
-	
-	if (!isPathSafe(path)) {
+
+	const fullPath = resolveMinecraftPath(path);
+	if (!fullPath) {
 		return json({ error: 'Invalid path' }, { status: 400 });
 	}
-
-	const fullPath = join(MC_SERVER_DIR, path);
 
 	try {
 		const stats = await stat(fullPath);
@@ -27,16 +20,16 @@ export const GET: RequestHandler = async ({ url }) => {
 			const items = entries.map((entry) => ({
 				name: entry.name,
 				isDirectory: entry.isDirectory(),
-				path: join(path, entry.name)
+				path: joinVirtualPath(path, entry.name)
 			}));
 			items.sort((a, b) => {
 				if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
 				return a.name.localeCompare(b.name);
 			});
-			return json({ type: 'directory', items, path });
+			return json({ type: 'directory', items, path, root: getMinecraftDir() });
 		} else {
 			const content = await readFile(fullPath, 'utf-8');
-			return json({ type: 'file', content, path });
+			return json({ type: 'file', content, path, root: getMinecraftDir() });
 		}
 	} catch (error) {
 		return json({ error: `Failed to read: ${error}` }, { status: 500 });
@@ -46,11 +39,10 @@ export const GET: RequestHandler = async ({ url }) => {
 export const POST: RequestHandler = async ({ request }) => {
 	const { action, path, content, newName } = await request.json();
 
-	if (!isPathSafe(path)) {
+	const fullPath = resolveMinecraftPath(path);
+	if (!fullPath) {
 		return json({ error: 'Invalid path' }, { status: 400 });
 	}
-
-	const fullPath = join(MC_SERVER_DIR, path);
 
 	try {
 		switch (action) {
@@ -72,10 +64,13 @@ export const POST: RequestHandler = async ({ request }) => {
 				return json({ success: true, message: 'Directory created' });
 
 			case 'rename':
-				if (!newName || !isPathSafe(join(dirname(path), newName))) {
+				if (!newName) {
 					return json({ error: 'Invalid new name' }, { status: 400 });
 				}
-				const newPath = join(MC_SERVER_DIR, dirname(path), newName);
+				const newPath = resolveMinecraftPath(joinVirtualPath(posix.dirname(path), newName));
+				if (!newPath) {
+					return json({ error: 'Invalid new name' }, { status: 400 });
+				}
 				const { rename } = await import('fs/promises');
 				await rename(fullPath, newPath);
 				return json({ success: true, message: 'Renamed successfully' });

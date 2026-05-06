@@ -63,13 +63,12 @@ echo -e "${BLUE}[1/7]${NC} Checking requirements..."
 
 if ! command -v node &> /dev/null; then
     echo -e "${RED}Error: Node.js is not installed${NC}"
-    echo "Please install Node.js 18+ from https://nodejs.org/"
+    echo "Please install Node.js 20.19+, 22.12+, or 24+ from https://nodejs.org/"
     exit 1
 fi
 
-NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    echo -e "${RED}Error: Node.js 18+ required (found v$NODE_VERSION)${NC}"
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major >= 24 ? 0 : 1)"; then
+    echo -e "${RED}Error: Node.js 20.19+, 22.12+, or 24+ required (found $(node -v))${NC}"
     exit 1
 fi
 echo -e "  ✓ Node.js $(node -v)"
@@ -95,7 +94,13 @@ if ! command -v java &> /dev/null; then
         exit 1
     fi
 fi
-echo -e "  ✓ Java $(java -version 2>&1 | head -1)"
+JAVA_VERSION_OUTPUT=$(java -version 2>&1 | head -1)
+JAVA_MAJOR=$(echo "$JAVA_VERSION_OUTPUT" | sed -E 's/.*version "([^"]+)".*/\1/' | awk -F. '{ if ($1 == "1") print $2; else print $1 }')
+if ! [[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || [ "$JAVA_MAJOR" -lt 17 ]; then
+    echo -e "${RED}Error: Java 17+ required (found $JAVA_VERSION_OUTPUT)${NC}"
+    exit 1
+fi
+echo -e "  ✓ Java $JAVA_VERSION_OUTPUT"
 
 # Install Node.js dependencies
 echo -e "\n${BLUE}[2/7]${NC} Installing dependencies..."

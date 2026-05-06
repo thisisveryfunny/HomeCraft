@@ -1,18 +1,18 @@
 import { json } from '@sveltejs/kit';
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { resolveMinecraftPath } from '$lib/server/config';
 import type { RequestHandler } from './$types';
-
-const MC_SERVER_DIR = '/minecraft';
-const PROPERTIES_FILE = join(MC_SERVER_DIR, 'server.properties');
 
 interface ServerProperties {
 	[key: string]: string;
 }
 
 async function readProperties(): Promise<ServerProperties> {
+	const propertiesFile = resolveMinecraftPath('server.properties');
+	if (!propertiesFile) return {};
+
 	try {
-		const content = await readFile(PROPERTIES_FILE, 'utf-8');
+		const content = await readFile(propertiesFile, 'utf-8');
 		const props: ServerProperties = {};
 		content.split('\n').forEach((line) => {
 			if (line.trim() && !line.startsWith('#')) {
@@ -29,9 +29,14 @@ async function readProperties(): Promise<ServerProperties> {
 }
 
 async function saveProperties(props: ServerProperties): Promise<void> {
+	const propertiesFile = resolveMinecraftPath('server.properties');
+	if (!propertiesFile) {
+		throw new Error('Invalid Minecraft server path');
+	}
+
 	const lines = Object.entries(props).map(([key, value]) => `${key}=${value}`);
 	lines.unshift('#Minecraft server properties');
-	await writeFile(PROPERTIES_FILE, lines.join('\n'), 'utf-8');
+	await writeFile(propertiesFile, lines.join('\n'), 'utf-8');
 }
 
 export const GET: RequestHandler = async () => {
