@@ -8,6 +8,14 @@
 		reason?: string;
 	}
 
+	interface ServerStatus {
+		running: boolean;
+		uptime: number | null;
+		playerCount: number;
+		players: string[];
+	}
+
+	let serverStatus = $state<ServerStatus>({ running: false, uptime: null, playerCount: 0, players: [] });
 	let whitelist = $state<Player[]>([]);
 	let ops = $state<Player[]>([]);
 	let banned = $state<Player[]>([]);
@@ -17,16 +25,19 @@
 	let banReason = $state('');
 	let loading = $state(true);
 	let message = $state('');
-	let activeTab = $state<'whitelist' | 'ops' | 'banned'>('whitelist');
+	let activeTab = $state<'player-list' | 'whitelist' | 'ops' | 'banned'>('player-list');
 
 	async function fetchAll() {
 		try {
-			const [playersRes, whitelistRes] = await Promise.all([
+			const [playersRes, whitelistRes, serverRes] = await Promise.all([
 				fetch('/api/players'),
-				fetch('/api/whitelist')
+				fetch('/api/whitelist'),
+				fetch('/api/server')
 			]);
 			const playersData = await playersRes.json();
 			const whitelistData = await whitelistRes.json();
+			const srvData = await serverRes.json();
+			serverStatus = srvData.status;
 			ops = playersData.ops;
 			banned = playersData.banned;
 			whitelist = whitelistData.whitelist;
@@ -37,6 +48,18 @@
 		}
 	}
 
+	async function fetchStatus() {
+		try {
+			const res = await fetch('/api/server');
+			const data = await res.json();
+			serverStatus = data.status;
+		} catch (e) {
+			console.error('Failed to fetch status:', e);
+		} finally {
+			loading = false;
+		}
+	}
+	
 	// Whitelist functions
 	async function addToWhitelist() {
 		if (!newWhitelist.trim()) return;
@@ -169,7 +192,11 @@
 		}
 	}
 
-	onMount(() => fetchAll());
+	onMount(() => {
+		fetchAll()
+		const interval = setInterval(fetchStatus, 3000);
+		return () => clearInterval(interval);
+	});
 </script>
 
 <div class="space-y-4">
@@ -184,6 +211,17 @@
 
 	<!-- Tabs -->
 	<div class="flex gap-2 border-b border-gray-700">
+		<button
+			onclick={() => (activeTab = 'player-list')}
+			class="px-4 py-2 font-medium transition-colors {activeTab === 'player-list'
+				? 'text-green-500 border-b-2 border-green-500'
+				: 'text-gray-400 hover:text-white'}"
+		>
+			👥 Player List (serverStatus.playerCount)
+			{#if serverStatus.running}
+				<span class="ml-1 text-xs text-gray-500">({serverStatus.players.join(', ')})</span>
+			{/if}
+		</button>
 		<button
 			onclick={() => (activeTab = 'whitelist')}
 			class="px-4 py-2 font-medium transition-colors {activeTab === 'whitelist'
@@ -239,12 +277,14 @@
 					{#each whitelist as player}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<img 
-									src="https://mc-heads.net/avatar/{player.name}/32" 
-									alt={player.name}
-									class="w-full h-full"
-									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-								/>
+								<div class="w-8 h-8 bg-gray-600 rounded overflow-hidden flex items-center justify-center">
+									<img 
+										src="https://mc-heads.net/avatar/{player.name}/32" 
+										alt={player.name}
+										class="w-full h-full"
+										onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+									/>
+								</div>
 								<div>
 									<div class="font-medium">{player.name}</div>
 									{#if player.uuid}
@@ -301,12 +341,14 @@
 					{#each ops as op}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<img 
-									src="https://mc-heads.net/avatar/{op.name}/32" 
-									alt={op.name}
-									class="w-full h-full"
-									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-								/>
+								<div class="w-8 h-8 bg-gray-600 rounded overflow-hidden flex items-center justify-center">
+									<img 
+										src="https://mc-heads.net/avatar/{op.name}/32" 
+										alt={op.name}
+										class="w-full h-full"
+										onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+									/>
+								</div>
 								<div>
 									<div class="font-medium">{op.name}</div>
 									<div class="text-xs text-gray-500">Level {op.level || 4}</div>
@@ -360,12 +402,14 @@
 					{#each banned as player}
 						<div class="flex items-center justify-between p-3 bg-gray-700 rounded hover:bg-gray-600 group">
 							<div class="flex items-center gap-3">
-								<img 
-									src="https://mc-heads.net/avatar/{player.name}/32" 
-									alt={player.name}
-									class="w-full h-full"
-									onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-								/>
+								<div class="w-8 h-8 bg-gray-600 rounded overflow-hidden flex items-center justify-center">
+									<img 
+										src="https://mc-heads.net/avatar/{player.name}/32" 
+										alt={player.name}
+										class="w-full h-full"
+										onerror={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+									/>
+								</div>
 								<div>
 									<div class="font-medium">{player.name}</div>
 									<div class="text-xs text-gray-500">{player.reason || 'No reason'}</div>
