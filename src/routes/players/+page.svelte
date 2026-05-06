@@ -124,6 +124,24 @@
 		}
 	}
 
+	async function addActiveToWhitelist(name: string) {
+		loading = true;
+		try {
+			const res = await fetch('/api/whitelist', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'add', name })
+			});
+			const data = await res.json();
+			message = data.message || data.error;
+			if (data.success) await fetchAll();
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			loading = false;
+		}
+	}
+
 	// Ops functions
 	async function addOp() {
 		if (!newOp.trim()) return;
@@ -173,6 +191,24 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ action: 'add', type: 'ops', name })
+			});
+			const data = await res.json();
+			message = data.message || data.error;
+			if (data.success) await fetchAll();
+		} catch (e) {
+			message = `Error: ${e}`;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function demoteActivePlayer(name: string) {
+		loading = true;
+		try {
+			const res = await fetch('/api/players', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'remove', type: 'ops', name })
 			});
 			const data = await res.json();
 			message = data.message || data.error;
@@ -356,20 +392,42 @@
 							</div>
 
 							<div class="flex flex-wrap gap-2 sm:justify-end">
-								<button
-									onclick={() => removeActiveFromWhitelist(player)}
-									disabled={loading || !hasPlayer(whitelist, player)}
-									class="btn-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-								>
-									Unwhitelist
-								</button>
-								<button
-									onclick={() => promoteActivePlayer(player)}
-									disabled={loading || hasPlayer(ops, player)}
-									class="btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-								>
-									Make Op
-								</button>
+								{#if hasPlayer(whitelist, player)}
+									<button
+										onclick={() => removeActiveFromWhitelist(player)}
+										disabled={loading}
+										class="btn-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										Unwhitelist
+									</button>
+								{:else}
+									<button
+										onclick={() => addActiveToWhitelist(player)}
+										disabled={loading}
+										class="btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										Whitelist
+									</button>
+								{/if}
+
+								{#if hasPlayer(ops, player)}
+									<button
+										onclick={() => demoteActivePlayer(player)}
+										disabled={loading}
+										class="btn-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										Remove Op
+									</button>
+								{:else}
+									<button
+										onclick={() => promoteActivePlayer(player)}
+										disabled={loading}
+										class="btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										Make Op
+									</button>
+								{/if}
+
 								<button
 									onclick={() => banActivePlayer(player)}
 									disabled={loading || hasPlayer(banned, player)}
