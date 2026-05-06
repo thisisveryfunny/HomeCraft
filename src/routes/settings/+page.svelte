@@ -70,6 +70,10 @@
 		{ key: 'enable-command-block', label: 'Command Blocks', type: 'boolean' },
 	];
 
+	function inputId(prefix: string, key: string): string {
+		return `${prefix}-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+	}
+
 	function parseMotd(motd: string) {
 		const lines = motd.split('\\n');
 		motdLine1 = lines[0] || '';
@@ -379,7 +383,7 @@
 			
 			<!-- Color Palette -->
 			<div class="mb-4">
-				<label class="text-sm text-gray-400 block mb-2">Color Palette</label>
+				<div class="text-sm text-gray-400 mb-2">Color Palette</div>
 				<div class="flex flex-wrap gap-1">
 					{#each mcColors as color}
 						<button
@@ -394,7 +398,7 @@
 
 			<!-- Format Buttons -->
 			<div class="mb-4">
-				<label class="text-sm text-gray-400 block mb-2">Formatting</label>
+				<div class="text-sm text-gray-400 mb-2">Formatting</div>
 				<div class="flex flex-wrap gap-2">
 					{#each formatCodes as fmt}
 						<button
@@ -418,12 +422,13 @@
 			<!-- Line 1 -->
 			<div class="mb-3">
 				<div class="flex items-center justify-between mb-1">
-					<label class="text-sm text-gray-400">Line 1</label>
+					<label for="motd-line-1" class="text-sm text-gray-400">Line 1</label>
 					<button onclick={() => insertColorCode(1)} class="text-xs btn-secondary py-1 px-2">
 						+ Add Color
 					</button>
 				</div>
 				<input
+					id="motd-line-1"
 					type="text"
 					bind:value={motdLine1}
 					oninput={updateMotd}
@@ -435,12 +440,13 @@
 			<!-- Line 2 -->
 			<div class="mb-4">
 				<div class="flex items-center justify-between mb-1">
-					<label class="text-sm text-gray-400">Line 2 (optional)</label>
+					<label for="motd-line-2" class="text-sm text-gray-400">Line 2 (optional)</label>
 					<button onclick={() => insertColorCode(2)} class="text-xs btn-secondary py-1 px-2">
 						+ Add Color
 					</button>
 				</div>
 				<input
+					id="motd-line-2"
 					type="text"
 					bind:value={motdLine2}
 					oninput={updateMotd}
@@ -451,7 +457,7 @@
 
 			<!-- Preview -->
 			<div class="bg-gray-900 rounded p-4 border border-gray-700">
-				<label class="text-xs text-gray-500 block mb-2">Preview</label>
+				<div class="text-xs text-gray-500 mb-2">Preview</div>
 				<div class="flex items-center gap-3">
 					<div class="w-12 h-12 bg-gray-700 rounded overflow-hidden flex-shrink-0">
 						{#if serverIcon}
@@ -488,36 +494,42 @@
 		<!-- Important Settings -->
 		<div class="card">
 			<h3 class="font-semibold mb-4 text-gray-300">⚙️ Server Configuration</h3>
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{#each importantSettings as setting}
-					<div class="space-y-1">
-						<label class="text-sm text-gray-400">{setting.label}</label>
-						{#if setting.type === 'boolean'}
-							<div class="flex items-center gap-3">
-								<button
-									onclick={() => updateProperty(setting.key, properties[setting.key] === 'true' ? 'false' : 'true')}
-									class="w-12 h-6 rounded-full transition-colors {properties[setting.key] === 'true' ? 'bg-green-600' : 'bg-gray-600'} relative"
-								>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{#each importantSettings as setting}
+						<div class="space-y-1">
+							<label for={inputId('setting', setting.key)} class="text-sm text-gray-400">{setting.label}</label>
+							{#if setting.type === 'boolean'}
+								<div class="flex items-center gap-3">
+									<button
+										id={inputId('setting', setting.key)}
+										type="button"
+										onclick={() => updateProperty(setting.key, properties[setting.key] === 'true' ? 'false' : 'true')}
+										aria-label="{setting.label}: {properties[setting.key] === 'true' ? 'Enabled' : 'Disabled'}"
+										aria-pressed={properties[setting.key] === 'true'}
+										class="w-12 h-6 rounded-full transition-colors {properties[setting.key] === 'true' ? 'bg-green-600' : 'bg-gray-600'} relative"
+									>
 									<div
 										class="w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform {properties[setting.key] === 'true' ? 'translate-x-6' : 'translate-x-0.5'}"
 									></div>
 								</button>
 								<span class="text-sm">{properties[setting.key] === 'true' ? 'Enabled' : 'Disabled'}</span>
 							</div>
-						{:else if setting.type === 'select'}
-							<select
-								value={properties[setting.key]}
-								onchange={(e) => updateProperty(setting.key, e.currentTarget.value)}
+							{:else if setting.type === 'select'}
+								<select
+									id={inputId('setting', setting.key)}
+									value={properties[setting.key]}
+									onchange={(e) => updateProperty(setting.key, e.currentTarget.value)}
 								class="input w-full"
 							>
 								{#each setting.options || [] as option}
 									<option value={option}>{option}</option>
 								{/each}
 							</select>
-						{:else}
-							<input
-								type={setting.type}
-								value={properties[setting.key] || ''}
+							{:else}
+								<input
+									id={inputId('setting', setting.key)}
+									type={setting.type}
+									value={properties[setting.key] || ''}
 								oninput={(e) => updateProperty(setting.key, e.currentTarget.value)}
 								class="input w-full"
 							/>
@@ -532,13 +544,14 @@
 			<summary class="font-semibold text-gray-300 cursor-pointer">
 				Advanced Settings (All Properties)
 			</summary>
-			<div class="mt-4 space-y-2 max-h-96 overflow-y-auto">
-				{#each Object.entries(properties).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
-					<div class="flex gap-2 items-center">
-						<label class="w-1/3 text-sm text-gray-400 truncate" title={key}>{key}</label>
-						<input
-							type="text"
-							value={value}
+				<div class="mt-4 space-y-2 max-h-96 overflow-y-auto">
+					{#each Object.entries(properties).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
+						<div class="flex gap-2 items-center">
+							<label for={inputId('property', key)} class="w-1/3 text-sm text-gray-400 truncate" title={key}>{key}</label>
+							<input
+								id={inputId('property', key)}
+								type="text"
+								value={value}
 							oninput={(e) => updateProperty(key, e.currentTarget.value)}
 							class="input flex-1 text-sm"
 						/>
