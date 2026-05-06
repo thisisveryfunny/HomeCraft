@@ -123,6 +123,30 @@ Linux:
 ./setup.sh --skip-service
 ```
 
+## Windows Installer
+
+The complete Windows installer tooling lives in `installer/`.
+
+Build requirements:
+
+- Windows x64
+- .NET 8 SDK or newer
+- Inno Setup 6
+
+Build the installer from PowerShell:
+
+```powershell
+.\installer\scripts\build-installer.ps1
+```
+
+The output is:
+
+```text
+dist\HomeCraftSetup.exe
+```
+
+The installer downloads portable Node.js, Java, and Git into the selected install folder, clones HomeCraft, lets the user choose a fresh or existing Minecraft server folder, builds the panel, and installs a `HomeCraft.exe` console launcher.
+
 ## Development
 
 ```bash
