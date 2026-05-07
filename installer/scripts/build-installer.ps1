@@ -1,6 +1,6 @@
 param(
 	[string]$Configuration = "Release",
-	[string]$InnoCompiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+	[string]$InnoCompiler = "C:\Users\meterpeter\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
 )
 
 $ErrorActionPreference = "Stop"
