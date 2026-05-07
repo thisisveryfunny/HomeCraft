@@ -28,7 +28,7 @@ $PackageAppDir = Join-Path $PackageDir "app"
 $PackageToolsDir = Join-Path $PackageDir "tools"
 $PackageInstallerDir = Join-Path $PackageDir "installer"
 $BuildToolsDir = Join-Path $InstallerRoot "dist\build-tools"
-$BuildWorkDir = Join-Path $InstallerRoot "dist\build-work"
+$BuildWorkDir = Join-Path $InstallerRoot ("dist\build-work-" + [System.Guid]::NewGuid().ToString("N"))
 $BuildSourceDir = Join-Path $BuildWorkDir "source"
 $InnoScript = Join-Path $InstallerRoot "inno\HomeCraftInstaller.iss"
 $OutputInstaller = Join-Path $RepoRoot "dist\HomeCraftSetup.exe"
@@ -220,11 +220,14 @@ function Invoke-OptionalSigning {
 
 $dotnet = Resolve-CommandPath @("dotnet.exe", "dotnet") ".NET SDK is required to publish the launcher. Install .NET 8 SDK or newer."
 $npm = Resolve-Npm
+$npmDir = Split-Path -Parent $npm
+if ($npmDir -and ($env:Path -notlike "*$npmDir*")) {
+	$env:Path = "$npmDir;$env:Path"
+}
 $resolvedInnoCompiler = Resolve-InnoCompiler
 
 Write-Host "Cleaning installer package staging..."
 Remove-Item -Recurse -Force $PackageDir -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force $BuildWorkDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $PackageAppDir, $PackageToolsDir, $PackageInstallerDir | Out-Null
 New-Item -ItemType Directory -Force -Path $BuildWorkDir | Out-Null
 
