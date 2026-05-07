@@ -18,7 +18,7 @@ $ProgressPreference = "SilentlyContinue"
 
 $NodeVersion = "22.12.0"
 $NodeZipUrl = "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip"
-$JavaZipUrl = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse"
+$JavaZipUrl = "https://api.adoptium.net/v3/binary/latest/25/ga/windows/x64/jre/hotspot/normal/eclipse"
 
 $InstallerRoot = Split-Path -Parent $PSScriptRoot
 $RepoRoot = Split-Path -Parent $InstallerRoot

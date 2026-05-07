@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Net;
 using System.Runtime.InteropServices;
 
 const int DefaultPort = 3000;
+const string Host = "0.0.0.0";
 
 var installDir = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 var appDir = Path.Combine(installDir, "app");
@@ -63,6 +66,7 @@ process.StartInfo = new ProcessStartInfo
 };
 process.StartInfo.Environment["PATH"] = string.Join(Path.PathSeparator, envPathParts);
 process.StartInfo.Environment["PORT"] = port.ToString();
+process.StartInfo.Environment["HOST"] = Host;
 process.StartInfo.Environment["NODE_ENV"] = "production";
 
 var stopping = false;
@@ -109,6 +113,11 @@ process.BeginOutputReadLine();
 process.BeginErrorReadLine();
 
 Console.WriteLine($"HomeCraft is starting on http://localhost:{port}");
+Console.WriteLine($"Listening on all interfaces ({Host}).");
+foreach (var address in GetLocalIPv4Addresses())
+{
+    Console.WriteLine($"LAN URL: http://{address}:{port}");
+}
 Console.WriteLine("Press Ctrl+C to stop.");
 Console.WriteLine();
 
@@ -161,6 +170,26 @@ static string? FindJavaBin(string toolsDir)
 
     var java = Directory.GetFiles(toolsDir, "java.exe", SearchOption.AllDirectories).FirstOrDefault();
     return java is null ? null : Path.GetDirectoryName(java);
+}
+
+static IEnumerable<string> GetLocalIPv4Addresses()
+{
+    try
+    {
+        return NetworkInterface.GetAllNetworkInterfaces()
+            .Where(adapter =>
+                adapter.OperationalStatus == OperationalStatus.Up &&
+                adapter.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+            .SelectMany(adapter => adapter.GetIPProperties().UnicastAddresses)
+            .Where(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
+            .Select(address => address.Address.ToString())
+            .Distinct()
+            .ToArray();
+    }
+    catch
+    {
+        return [];
+    }
 }
 
 static void OpenBrowserWhenReady(int port, Process process)
