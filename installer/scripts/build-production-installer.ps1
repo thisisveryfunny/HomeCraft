@@ -237,12 +237,13 @@ Copy-SourceForBuild $BuildSourceDir
 Write-Host "Building HomeCraft app locally..."
 Invoke-Checked $npm @("ci") $BuildSourceDir
 Invoke-Checked $npm @("run", "build") $BuildSourceDir
+Invoke-Checked $npm @("prune", "--omit=dev", "--no-audit", "--fund=false") $BuildSourceDir
 
 Write-Host "Staging app payload..."
 Copy-Directory (Join-Path $BuildSourceDir "build") (Join-Path $PackageAppDir "build")
 Copy-Item -Path (Join-Path $BuildSourceDir "package.json") -Destination $PackageAppDir -Force
 Copy-Item -Path (Join-Path $BuildSourceDir "package-lock.json") -Destination $PackageAppDir -Force
-Invoke-Checked $npm @("ci", "--omit=dev", "--no-audit", "--fund=false") $PackageAppDir
+Copy-Directory (Join-Path $BuildSourceDir "node_modules") (Join-Path $PackageAppDir "node_modules")
 
 Write-Host "Staging portable Node.js..."
 Prepare-Node (Join-Path $PackageToolsDir "node")
@@ -263,8 +264,11 @@ Invoke-Checked $dotnet @(
 	"-p:PublishTrimmed=false",
 	"-o", $LauncherPublishDir
 ) $RepoRoot
+
+Write-Host "Staging launcher executable..."
 Copy-Item -Path (Join-Path $LauncherPublishDir "HomeCraft.exe") -Destination (Join-Path $PackageDir "HomeCraft.exe") -Force
 
+Write-Host "Staging installer configuration script..."
 Copy-Item -Path (Join-Path $InstallerRoot "scripts\bootstrap-homecraft.ps1") -Destination $PackageInstallerDir -Force
 
 Write-Host "Validating staged payload..."
