@@ -28,6 +28,8 @@ $PackageAppDir = Join-Path $PackageDir "app"
 $PackageToolsDir = Join-Path $PackageDir "tools"
 $PackageInstallerDir = Join-Path $PackageDir "installer"
 $BuildToolsDir = Join-Path $InstallerRoot "dist\build-tools"
+$BuildWorkDir = Join-Path $InstallerRoot "dist\build-work"
+$BuildSourceDir = Join-Path $BuildWorkDir "source"
 $InnoScript = Join-Path $InstallerRoot "inno\HomeCraftInstaller.iss"
 $OutputInstaller = Join-Path $RepoRoot "dist\HomeCraftSetup.exe"
 
@@ -77,6 +79,33 @@ function Copy-Directory($Source, $Destination) {
 
 	New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 	Copy-Item -Path (Join-Path $Source "*") -Destination $Destination -Recurse -Force
+}
+
+function Copy-SourceForBuild($Destination) {
+	if (Test-Path $Destination) {
+		Remove-Item -Recurse -Force $Destination
+	}
+
+	New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+
+	$requiredItems = @(
+		"package.json",
+		"package-lock.json",
+		"svelte.config.js",
+		"tsconfig.json",
+		"vite.config.ts",
+		"src",
+		"static"
+	)
+
+	foreach ($item in $requiredItems) {
+		$source = Join-Path $RepoRoot $item
+		if (-not (Test-Path $source)) {
+			throw "Required source item was not found: $source"
+		}
+
+		Copy-Item -Path $source -Destination (Join-Path $Destination $item) -Recurse -Force
+	}
 }
 
 function Download-File($Url, $OutFile) {
@@ -195,16 +224,21 @@ $resolvedInnoCompiler = Resolve-InnoCompiler
 
 Write-Host "Cleaning installer package staging..."
 Remove-Item -Recurse -Force $PackageDir -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force $BuildWorkDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $PackageAppDir, $PackageToolsDir, $PackageInstallerDir | Out-Null
+New-Item -ItemType Directory -Force -Path $BuildWorkDir | Out-Null
+
+Write-Host "Creating clean build source copy..."
+Copy-SourceForBuild $BuildSourceDir
 
 Write-Host "Building HomeCraft app locally..."
-Invoke-Checked $npm @("ci") $RepoRoot
-Invoke-Checked $npm @("run", "build") $RepoRoot
+Invoke-Checked $npm @("ci") $BuildSourceDir
+Invoke-Checked $npm @("run", "build") $BuildSourceDir
 
 Write-Host "Staging app payload..."
-Copy-Directory (Join-Path $RepoRoot "build") (Join-Path $PackageAppDir "build")
-Copy-Item -Path (Join-Path $RepoRoot "package.json") -Destination $PackageAppDir -Force
-Copy-Item -Path (Join-Path $RepoRoot "package-lock.json") -Destination $PackageAppDir -Force
+Copy-Directory (Join-Path $BuildSourceDir "build") (Join-Path $PackageAppDir "build")
+Copy-Item -Path (Join-Path $BuildSourceDir "package.json") -Destination $PackageAppDir -Force
+Copy-Item -Path (Join-Path $BuildSourceDir "package-lock.json") -Destination $PackageAppDir -Force
 Invoke-Checked $npm @("ci", "--omit=dev", "--no-audit", "--fund=false") $PackageAppDir
 
 Write-Host "Staging portable Node.js..."
