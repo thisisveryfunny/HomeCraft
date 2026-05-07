@@ -27,6 +27,7 @@ $PackageDir = Join-Path $InstallerRoot "dist\package"
 $PackageAppDir = Join-Path $PackageDir "app"
 $PackageToolsDir = Join-Path $PackageDir "tools"
 $PackageInstallerDir = Join-Path $PackageDir "installer"
+$BuildToolsDir = Join-Path $InstallerRoot "dist\build-tools"
 $InnoScript = Join-Path $InstallerRoot "inno\HomeCraftInstaller.iss"
 $OutputInstaller = Join-Path $RepoRoot "dist\HomeCraftSetup.exe"
 
@@ -126,6 +127,24 @@ function Prepare-Node($Destination) {
 	}
 }
 
+function Resolve-Npm {
+	$command = Get-Command @("npm.cmd", "npm.exe", "npm") -ErrorAction SilentlyContinue | Select-Object -First 1
+	if ($command) {
+		return $command.Source
+	}
+
+	Write-Warning "npm was not found on PATH. Downloading portable Node.js for the build."
+	$buildNodeDir = Join-Path $BuildToolsDir "node"
+	Prepare-Node $buildNodeDir
+
+	$npmPath = Join-Path $buildNodeDir "npm.cmd"
+	if (-not (Test-Path $npmPath)) {
+		throw "Portable Node.js was staged, but npm.cmd was not found: $npmPath"
+	}
+
+	return $npmPath
+}
+
 function Prepare-Java($Destination) {
 	if ($JavaSource) {
 		Copy-Directory $JavaSource $Destination
@@ -171,7 +190,7 @@ function Invoke-OptionalSigning {
 }
 
 $dotnet = Resolve-CommandPath @("dotnet.exe", "dotnet") ".NET SDK is required to publish the launcher. Install .NET 8 SDK or newer."
-$npm = Resolve-CommandPath @("npm.cmd", "npm.exe", "npm") "npm is required to build the production installer payload."
+$npm = Resolve-Npm
 $resolvedInnoCompiler = Resolve-InnoCompiler
 
 Write-Host "Cleaning installer package staging..."
