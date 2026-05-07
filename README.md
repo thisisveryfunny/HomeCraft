@@ -131,12 +131,13 @@ Build requirements:
 
 - Windows x64
 - .NET 8 SDK or newer
+- Node.js/npm
 - Inno Setup 6
 
-Build the installer from PowerShell:
+Build the production installer from PowerShell:
 
 ```powershell
-.\installer\scripts\build-installer.ps1
+.\installer\scripts\build-production-installer.ps1
 ```
 
 The output is:
@@ -145,7 +146,7 @@ The output is:
 dist\HomeCraftSetup.exe
 ```
 
-The installer downloads portable Node.js, Java, and Git into the selected install folder, clones HomeCraft, lets the user choose a fresh or existing Minecraft server folder, builds the panel, and installs a `HomeCraft.exe` console launcher.
+The production installer bundles the built HomeCraft app, production `node_modules`, portable Node.js, portable Java, and a `HomeCraft.exe` console launcher. It does not require Node.js, Java, Git, npm, or internet access on the user's machine. The installer asks for an existing Minecraft server folder containing `server.jar`.
 
 ## Development
 

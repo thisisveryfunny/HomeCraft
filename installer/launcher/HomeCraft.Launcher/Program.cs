@@ -18,23 +18,23 @@ Console.WriteLine();
 
 if (!Directory.Exists(appDir))
 {
-    Fail($"HomeCraft app folder was not found: {appDir}");
+    FailWithInstallLog($"HomeCraft app folder was not found: {appDir}", installDir);
 }
 
 if (!Directory.Exists(Path.Combine(appDir, "build")))
 {
-    Fail($"HomeCraft has not been built yet. Missing folder: {Path.Combine(appDir, "build")}");
+    FailWithInstallLog($"HomeCraft has not been built yet. Missing folder: {Path.Combine(appDir, "build")}", installDir);
 }
 
 if (nodeExe is null)
 {
-    Fail("Node.js was not found. Re-run the HomeCraft installer or bootstrap script.");
+    FailWithInstallLog("Node.js was not found. Re-run the HomeCraft installer or bootstrap script.", installDir);
 }
 
 var configPath = Path.Combine(appDir, ".homecraft", "config.json");
 if (!File.Exists(configPath))
 {
-    Fail($"HomeCraft config was not found: {configPath}");
+    FailWithInstallLog($"HomeCraft config was not found: {configPath}", installDir);
 }
 
 var envPathParts = new List<string>
@@ -250,4 +250,45 @@ static void Fail(string message)
     Console.Error.WriteLine("Press Enter to close this window.");
     Console.ReadLine();
     Environment.Exit(1);
+}
+
+static void FailWithInstallLog(string message, string installDir)
+{
+    var logPath = Path.Combine(installDir, "logs", "install.log");
+
+    Console.Error.WriteLine(message);
+    if (File.Exists(logPath))
+    {
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"Install log: {logPath}");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("Last install log lines:");
+        foreach (var line in ReadLastLines(logPath, 20))
+        {
+            Console.Error.WriteLine(line);
+        }
+    }
+    else
+    {
+        Console.Error.WriteLine();
+        Console.Error.WriteLine($"Install log was not found: {logPath}");
+    }
+
+    Console.Error.WriteLine();
+    Console.Error.WriteLine("Press Enter to close this window.");
+    Console.ReadLine();
+    Environment.Exit(1);
+}
+
+static IEnumerable<string> ReadLastLines(string path, int count)
+{
+    try
+    {
+        var lines = File.ReadLines(path).TakeLast(count);
+        return lines.ToArray();
+    }
+    catch (Exception ex)
+    {
+        return [$"Could not read install log: {ex.Message}"];
+    }
 }

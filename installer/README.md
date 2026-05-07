@@ -1,12 +1,12 @@
 # HomeCraft Windows Installer
 
-This folder contains the Windows installer tooling for HomeCraft.
+This folder contains the Windows production installer tooling for HomeCraft.
 
-## What it builds
+## What It Builds
 
 - `HomeCraftSetup.exe` with Inno Setup.
 - A self-contained C# console launcher named `HomeCraft.exe`.
-- A PowerShell bootstrapper that installs portable tools, clones HomeCraft, prepares Minecraft, and builds the SvelteKit app.
+- A self-contained install payload with built HomeCraft app files, production `node_modules`, portable Node.js, and portable Java.
 
 The installed layout is:
 
@@ -17,25 +17,28 @@ The installed layout is:
   tools\
     node\
     java\
-    git\
   app\
-    .git\
     build\
+    node_modules\
+    package.json
+    package-lock.json
     .homecraft\config.json
 ```
 
-## Build requirements
+## Build Requirements
 
 - Windows x64
 - .NET 8 SDK or newer
+- Node.js/npm for building the package
 - Inno Setup 6
+- Internet access on the build machine unless `installer/vendor/` already contains the Node and Java archives
 
-## Build command
+## Build Command
 
 From the repo root:
 
 ```powershell
-.\installer\scripts\build-installer.ps1
+.\installer\scripts\build-production-installer.ps1
 ```
 
 The installer is written to:
@@ -44,27 +47,39 @@ The installer is written to:
 dist\HomeCraftSetup.exe
 ```
 
-## Installer behavior
+`build-installer.ps1` calls the same production build script for compatibility.
+
+## Installer Behavior
+
+The production installer does not clone GitHub, download dependencies, run npm, or build HomeCraft on the user's machine.
 
 The installer asks for:
 
 - HomeCraft install folder
-- fresh vanilla Minecraft server or existing server folder
-- Minecraft server folder
-- Minecraft EULA acceptance when creating a fresh server
+- existing Minecraft server folder containing `server.jar`
 
-During installation, the bootstrapper:
+The installer then writes:
 
-- downloads portable Node.js 22.12.0
-- downloads portable Java 21 JRE
-- downloads latest Portable Git for Windows
-- clones `https://github.com/thisisveryfunny/HomeCraft.git` into `app`
-- runs `npm install`
-- runs `npm run build`
-- writes `app\.homecraft\config.json`
+```text
+app\.homecraft\config.json
+```
 
 The Start Menu shortcut runs `HomeCraft.exe`, which starts the production SvelteKit server on:
 
 ```text
 http://localhost:3000
+```
+
+## Optional Signing
+
+To sign with a certificate thumbprint:
+
+```powershell
+.\installer\scripts\build-production-installer.ps1 -SignCertificateThumbprint "THUMBPRINT"
+```
+
+To sign with a `.pfx`:
+
+```powershell
+.\installer\scripts\build-production-installer.ps1 -SignCertificatePath "C:\certs\homecraft.pfx" -SignCertificatePassword "password"
 ```

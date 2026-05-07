@@ -1,35 +1,30 @@
 param(
 	[string]$Configuration = "Release",
-	[string]$InnoCompiler = "C:\Users\meterpeter\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
+	[string]$InnoCompiler = "",
+	[string]$NodeArchive = "",
+	[string]$NodeSource = "",
+	[string]$JavaArchive = "",
+	[string]$JavaSource = "",
+	[string]$SignTool = "",
+	[string]$SignCertificateThumbprint = "",
+	[string]$SignCertificatePath = "",
+	[string]$SignCertificatePassword = "",
+	[string]$TimestampUrl = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
 
-$InstallerRoot = Split-Path -Parent $PSScriptRoot
-$RepoRoot = Split-Path -Parent $InstallerRoot
-$LauncherProject = Join-Path $InstallerRoot "launcher\HomeCraft.Launcher\HomeCraft.Launcher.csproj"
-$PublishDir = Join-Path $InstallerRoot "dist\launcher"
-$InnoScript = Join-Path $InstallerRoot "inno\HomeCraftInstaller.iss"
+$ProductionScript = Join-Path $PSScriptRoot "build-production-installer.ps1"
 
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-	throw ".NET SDK is required to publish the launcher. Install .NET 8 SDK or newer."
-}
-
-if (-not (Test-Path $InnoCompiler)) {
-	throw "Inno Setup compiler was not found at '$InnoCompiler'. Install Inno Setup 6 or pass -InnoCompiler."
-}
-
-Remove-Item -Recurse -Force $PublishDir -ErrorAction SilentlyContinue
-dotnet publish $LauncherProject `
-	-c $Configuration `
-	-r win-x64 `
-	--self-contained true `
-	-p:PublishSingleFile=true `
-	-p:PublishTrimmed=false `
-	-o $PublishDir
-
-& $InnoCompiler $InnoScript
-
-Write-Host ""
-Write-Host "Installer output:"
-Write-Host (Join-Path $RepoRoot "dist\HomeCraftSetup.exe")
+& $ProductionScript `
+	-Configuration $Configuration `
+	-InnoCompiler $InnoCompiler `
+	-NodeArchive $NodeArchive `
+	-NodeSource $NodeSource `
+	-JavaArchive $JavaArchive `
+	-JavaSource $JavaSource `
+	-SignTool $SignTool `
+	-SignCertificateThumbprint $SignCertificateThumbprint `
+	-SignCertificatePath $SignCertificatePath `
+	-SignCertificatePassword $SignCertificatePassword `
+	-TimestampUrl $TimestampUrl

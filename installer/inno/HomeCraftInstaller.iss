@@ -1,7 +1,11 @@
 #define MyAppName "HomeCraft"
 #define MyAppVersion "0.1.0"
-#define RepoRoot "..\.."
-#define InstallerRoot ".."
+#ifndef OutputRoot
+#define OutputRoot "..\..\dist"
+#endif
+#ifndef PackageRoot
+#define PackageRoot "..\dist\package"
+#endif
 
 [Setup]
 AppId={{7F6E62A8-52E5-47C0-96E7-6EAE9200F3A1}
@@ -11,7 +15,7 @@ AppPublisher=HomeCraft
 DefaultDirName={localappdata}\Programs\HomeCraft
 DefaultGroupName=HomeCraft
 DisableProgramGroupPage=yes
-OutputDir={#RepoRoot}\dist
+OutputDir={#OutputRoot}
 OutputBaseFilename=HomeCraftSetup
 Compression=lzma2
 SolidCompression=yes
@@ -28,64 +32,42 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
+[Dirs]
+Name: "{app}\logs"
+
 [Files]
-Source: "{#InstallerRoot}\dist\launcher\HomeCraft.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#InstallerRoot}\scripts\bootstrap-homecraft.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "{#PackageRoot}\HomeCraft.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PackageRoot}\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageRoot}\tools\*"; DestDir: "{app}\tools"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageRoot}\installer\*"; DestDir: "{app}\installer"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\HomeCraft"; Filename: "{app}\HomeCraft.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\HomeCraft"; Filename: "{app}\HomeCraft.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "powershell.exe"; \
-	Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\installer\bootstrap-homecraft.ps1"" -InstallDir ""{app}"" -MinecraftMode ""{code:GetMinecraftMode}"" -MinecraftDir ""{code:GetMinecraftDir}"" -AcceptMinecraftEula {code:GetMinecraftEulaAccepted}"; \
-	Description: "Install HomeCraft dependencies and build the app"; \
-	Flags: waituntilterminated
-Filename: "{app}\HomeCraft.exe"; Description: "Launch HomeCraft"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\HomeCraft.exe"; Description: "Launch HomeCraft"; Flags: nowait postinstall skipifsilent unchecked; Check: ShouldLaunchHomeCraft
 
 [Code]
 var
-	ServerModePage: TInputOptionWizardPage;
 	MinecraftPathPage: TInputDirWizardPage;
-	EulaPage: TInputOptionWizardPage;
+	BootstrapSucceeded: Boolean;
 
 procedure InitializeWizard;
 begin
-	ServerModePage :=
-		CreateInputOptionPage(
-			wpSelectDir,
-			'Minecraft Server',
-			'Choose how HomeCraft should connect to Minecraft.',
-			'Select whether the installer should create a fresh vanilla server or use an existing server folder.',
-			True,
-			False
-		);
-	ServerModePage.Add('Create a fresh vanilla Minecraft server');
-	ServerModePage.Add('Use an existing Minecraft server folder');
-	ServerModePage.Values[0] := True;
+	BootstrapSucceeded := False;
 
 	MinecraftPathPage :=
 		CreateInputDirPage(
-			ServerModePage.ID,
+			wpSelectDir,
 			'Minecraft Server Folder',
-			'Choose the Minecraft server folder.',
-			'For a fresh server, this folder will be created if needed. For an existing server, it must already contain server.jar.',
+			'Choose your existing Minecraft server folder.',
+			'Select the folder that already contains server.jar. HomeCraft uses this folder to start and manage your server.',
 			False,
 			''
 		);
 	MinecraftPathPage.Add('');
 	MinecraftPathPage.Values[0] := ExpandConstant('{userdocs}\HomeCraft Minecraft');
-
-	EulaPage :=
-		CreateInputOptionPage(
-			MinecraftPathPage.ID,
-			'Minecraft EULA',
-			'Accept the Minecraft EULA for fresh server setup.',
-			'HomeCraft can only create a fresh server when you confirm that you accept the Minecraft EULA.',
-			False,
-			False
-		);
-	EulaPage.Add('I accept the Minecraft EULA');
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -99,48 +81,84 @@ begin
 			exit;
 		end;
 
-		if ServerModePage.Values[1] and not FileExists(AddBackslash(MinecraftPathPage.Values[0]) + 'server.jar') then begin
-			MsgBox('Existing server folders must contain server.jar.', mbError, MB_OK);
+		if not DirExists(MinecraftPathPage.Values[0]) then begin
+			MsgBox('The selected Minecraft server folder does not exist.', mbError, MB_OK);
+			Result := False;
+			exit;
+		end;
+
+		if not FileExists(AddBackslash(MinecraftPathPage.Values[0]) + 'server.jar') then begin
+			MsgBox('The selected Minecraft server folder must contain server.jar.', mbError, MB_OK);
 			Result := False;
 			exit;
 		end;
 	end;
+end;
 
-	if CurPageID = EulaPage.ID then begin
-		if ServerModePage.Values[0] and not EulaPage.Values[0] then begin
-			MsgBox('You must accept the Minecraft EULA to create a fresh server.', mbError, MB_OK);
-			Result := False;
-			exit;
+function Quote(Value: String): String;
+begin
+	Result := '"' + Value + '"';
+end;
+
+function GetBootstrapParameters: String;
+begin
+	Result :=
+		'-NoProfile -ExecutionPolicy Bypass -File ' +
+		Quote(ExpandConstant('{app}\installer\bootstrap-homecraft.ps1')) +
+		' -InstallDir ' + Quote(ExpandConstant('{app}')) +
+		' -MinecraftDir ' + Quote(MinecraftPathPage.Values[0]);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+	ResultCode: Integer;
+	AppBuildDir: String;
+	LogFile: String;
+begin
+	if CurStep = ssPostInstall then begin
+		WizardForm.StatusLabel.Caption := 'Configuring HomeCraft...';
+
+		if not Exec(
+			'powershell.exe',
+			GetBootstrapParameters,
+			ExpandConstant('{app}'),
+			SW_SHOW,
+			ewWaitUntilTerminated,
+			ResultCode
+		) then begin
+			MsgBox('Could not start PowerShell to configure HomeCraft.', mbError, MB_OK);
+			Abort;
 		end;
+
+		if ResultCode <> 0 then begin
+			LogFile := ExpandConstant('{app}\logs\install.log');
+			MsgBox(
+				'HomeCraft configuration failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
+				'Check the install log at:' + #13#10 + LogFile,
+				mbError,
+				MB_OK
+			);
+			Abort;
+		end;
+
+		AppBuildDir := ExpandConstant('{app}\app\build');
+		if not DirExists(AppBuildDir) then begin
+			LogFile := ExpandConstant('{app}\logs\install.log');
+			MsgBox(
+				'HomeCraft was not installed correctly. Missing folder:' + #13#10 +
+				AppBuildDir + #13#10 + #13#10 +
+				'Check the install log at:' + #13#10 + LogFile,
+				mbError,
+				MB_OK
+			);
+			Abort;
+		end;
+
+		BootstrapSucceeded := True;
 	end;
 end;
 
-function ShouldSkipPage(PageID: Integer): Boolean;
+function ShouldLaunchHomeCraft: Boolean;
 begin
-	Result := False;
-
-	if PageID = EulaPage.ID then begin
-		Result := ServerModePage.Values[1];
-	end;
-end;
-
-function GetMinecraftMode(Param: String): String;
-begin
-	if ServerModePage.Values[0] then
-		Result := 'Fresh'
-	else
-		Result := 'Existing';
-end;
-
-function GetMinecraftDir(Param: String): String;
-begin
-	Result := MinecraftPathPage.Values[0];
-end;
-
-function GetMinecraftEulaAccepted(Param: String): String;
-begin
-	if ServerModePage.Values[0] and EulaPage.Values[0] then
-		Result := '$true'
-	else
-		Result := '$false';
+	Result := BootstrapSucceeded and DirExists(ExpandConstant('{app}\app\build'));
 end;
